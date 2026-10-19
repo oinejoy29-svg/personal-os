@@ -7,143 +7,116 @@
   <meta name="theme-color" content="#0b0d12">
   <title>PERSONAL OS</title>
   <link rel="stylesheet" href="style.css">
-  <script src="app.js" defer></script>
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="#">PERSONAL<span> OS</span></a>
-    <span class="status"><i></i> LOCAL PREVIEW</span>
+    <div>
+      <div class="brand">PERSONAL OS</div>
+      <div class="muted" id="today"></div>
+    </div>
+    <span class="status">LOCAL STORAGE</span>
   </header>
 
-  <main class="dashboard">
-    <section class="welcome">
-      <div>
-        <p class="eyebrow">YOUR PERSONAL DASHBOARD</p>
-        <h1>Good day<span class="accent">.</span></h1>
-        <p class="muted">自分の時間とお金を、自分で管理する。</p>
-      </div>
-      <div class="datebox">
-        <span class="muted">TODAY</span>
-        <strong id="today">----</strong>
-      </div>
-    </section>
-
-    <div class="section-heading">
-      <span class="section-number">01</span>
-      <h2>TODO</h2>
-      <span class="muted">TASK MANAGEMENT</span>
-    </div>
-    <section class="panel">
-      <div class="panel-heading">
+  <main>
+    <section class="quick panel">
+      <div class="section-head">
         <div>
-          <h3>Active tasks</h3>
-          <p class="muted">今日やること、これからやること。</p>
-        </div>
-        <span class="count" id="task-count">02 TASKS</span>
-      </div>
-      <form id="task-form" class="add-form">
-        <input id="task-input" placeholder="新しいタスクを入力..." maxlength="120" required>
-        <button type="submit">＋ ADD</button>
-      </form>
-      <div id="task-list" class="task-list">
-        <div class="task">
-          <span class="task-marker"></span>
-          <div class="task-content">
-            <strong>PERSONAL OSを作る</strong>
-            <small>HIGH PRIORITY · START HERE</small>
-          </div>
-          <button class="complete-button" type="button">COMPLETE ✓</button>
-        </div>
-        <div class="task">
-          <span class="task-marker"></span>
-          <div class="task-content">
-            <strong>今月の予算を確認する</strong>
-            <small>NORMAL PRIORITY · MONEY</small>
-          </div>
-          <button class="complete-button" type="button">COMPLETE ✓</button>
+          <div class="eyebrow">QUICK ADD</div>
+          <h2>すぐに記録</h2>
         </div>
       </div>
-      <div class="completed-area">
-        <span class="muted">COMPLETED</span>
-        <span id="completed-count">0 tasks</span>
+      <div class="quick-tabs">
+        <button class="tab active" data-target="todo">＋ TODO</button>
+        <button class="tab" data-target="money">＋ MONEY</button>
+        <button class="tab" data-target="later">＋ LATER</button>
       </div>
+      <p class="muted small">種類を選んで、すぐに入力。</p>
     </section>
 
-    <div class="section-heading">
-      <span class="section-number">02</span>
+    <section id="todo" class="panel">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">01 / TASK MANAGEMENT</div>
+          <h2>TODO</h2>
+        </div>
+        <span class="count" id="todoCount">0 TASKS</span>
+      </div>
+
+      <form id="todoForm" class="todo-form">
+        <input id="todoTitle" placeholder="何をする？" required maxlength="120">
+
+        <div class="form-row">
+          <select id="todoGenre" aria-label="ジャンル">
+            <option>仕事</option>
+            <option>生活</option>
+            <option>個人</option>
+            <option>その他</option>
+          </select>
+
+          <input id="todoDue" type="date" aria-label="期日" required>
+        </div>
+
+        <div class="weight-row">
+          <span class="muted small">重さ・警告タイミング</span>
+          <div class="weight-options">
+            <label><input type="radio" name="weight" value="light"> 軽</label>
+            <label><input type="radio" name="weight" value="normal" checked> 普</label>
+            <label><input type="radio" name="weight" value="heavy"> 重</label>
+          </div>
+        </div>
+
+        <button class="primary" type="submit">＋ 追加</button>
+      </form>
+
+      <div class="timeline-label">ACTIVE TASKS</div>
+      <div id="todoList" class="todo-list"></div>
+
+      <div class="section-head completed-head">
+        <h3>COMPLETED</h3>
+        <span id="completedCount" class="muted small">0</span>
+      </div>
+      <div id="completedList" class="todo-list"></div>
+    </section>
+
+    <section id="money" class="panel">
+      <div class="eyebrow">02 / FINANCE</div>
       <h2>MONEY</h2>
-      <span class="muted">MONTHLY CONTROL</span>
-    </div>
-    <section class="panel money-panel">
-      <div class="panel-heading">
-        <div>
-          <h3>Available to spend</h3>
-          <p class="muted">今月、あといくら使える？</p>
+      <p class="muted">これは簡易記録。実際の銀行残高とは連動しません。</p>
+      <div class="money-grid">
+        <div class="metric">
+          <span class="muted small">今月の予算</span>
+          <strong id="budgetView">¥100,000</strong>
         </div>
-        <span class="demo-label">SAMPLE DATA</span>
-      </div>
-      <div class="money-main">
-        <div>
-          <p class="muted">REMAINING ALLOWED</p>
-          <div class="big-number" id="remaining">¥80,000</div>
-          <p class="muted">今月の予算から支出を引いた金額</p>
+        <div class="metric">
+          <span class="muted small">今月の支出</span>
+          <strong id="spentView">¥0</strong>
         </div>
-        <div class="donut-wrap">
-          <div class="donut" id="donut">
-            <div class="donut-center">
-              <strong id="spent-percent">20%</strong>
-              <span>SPENT</span>
-            </div>
-          </div>
+        <div class="metric">
+          <span class="muted small">残り予算</span>
+          <strong id="remainingView">¥100,000</strong>
         </div>
       </div>
-      <div class="money-stats">
-        <div class="stat">
-          <span class="muted">MONTHLY BUDGET</span>
-          <strong id="budget">¥100,000</strong>
-        </div>
-        <div class="stat">
-          <span class="muted">SPENT · CLICK TO ADD</span>
-          <button id="spent-button" class="stat-button" type="button">¥20,000 ＋</button>
-        </div>
-        <div class="stat">
-          <span class="muted">SAVED THIS MONTH</span>
-          <strong>¥10,000</strong>
-        </div>
-        <div class="stat">
-          <span class="muted">TOTAL SAVED</span>
-          <strong>¥120,000</strong>
-        </div>
-      </div>
-      <p class="footnote">※ 表示はサンプル。実際の家計データはまだ保存されません。</p>
-    </section>
-
-    <div class="section-heading">
-      <span class="section-number">03</span>
-      <h2>LATER</h2>
-      <span class="muted">SAVE FOR LATER</span>
-    </div>
-    <section class="panel">
-      <div class="panel-heading">
-        <div>
-          <h3>Keep it for later</h3>
-          <p class="muted">リンクやメモを、ここに保存。</p>
-        </div>
-      </div>
-      <form id="later-form" class="later-form">
-        <input id="later-title" placeholder="タイトル" maxlength="100" required>
-        <input id="later-url" type="url" placeholder="https://example.com (任意)">
-        <button type="submit">＋ SAVE</button>
+      <form id="moneyForm" class="inline-form">
+        <input id="moneyAmount" type="number" min="1" step="1" placeholder="支出額（円）" required>
+        <button class="primary" type="submit">記録</button>
       </form>
-      <div id="later-list" class="later-list">
-        <p class="empty-state">まだ保存したものはありません。</p>
-      </div>
+      <div id="moneyList" class="record-list"></div>
     </section>
 
-    <footer>
-      <span>PERSONAL OS</span>
-      <span>BUILT FOR YOUR LIFE · SYNC NOT CONFIGURED</span>
-    </footer>
+    <section id="later" class="panel">
+      <div class="eyebrow">03 / SAVE FOR LATER</div>
+      <h2>LATER</h2>
+      <form id="laterForm" class="later-form">
+        <input id="laterTitle" placeholder="タイトル（任意）">
+        <input id="laterUrl" type="url" placeholder="URL（https://...）">
+        <textarea id="laterNote" rows="2" placeholder="メモ（任意）"></textarea>
+        <button class="primary" type="submit">＋ 保存</button>
+      </form>
+      <div id="laterList" class="later-list"></div>
+    </section>
   </main>
+
+  <footer>PERSONAL OS · SAVED IN THIS BROWSER</footer>
+  <script src="app.js"></script>
 </body>
 </html>
