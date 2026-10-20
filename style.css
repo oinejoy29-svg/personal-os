@@ -271,3 +271,303 @@ footer {
   .inline-form { grid-template-columns: 1fr; }
 }
 
+/* ===== 見やすさ重視のレイアウト ===== */
+
+:root {
+  --bg: #f4f6f8;
+  --panel: #ffffff;
+  --border: #dfe4ea;
+  --text: #202631;
+  --muted: #667085;
+  --blue: #2764d8;
+  --yellow: #b77908;
+  --red: #c62828;
+  --green: #16804a;
+  color-scheme: light;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.topbar {
+  background: #fff;
+  padding: 20px max(16px, calc((100% - 1000px) / 2));
+}
+
+.brand {
+  font-size: 20px;
+  letter-spacing: 0;
+}
+
+.status {
+  color: var(--muted);
+  letter-spacing: 0;
+  font-size: 12px;
+}
+
+main {
+  width: min(1000px, calc(100% - 24px));
+  gap: 16px;
+  margin: 16px auto;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 22px;
+}
+
+h2 {
+  font-size: 26px;
+}
+
+.eyebrow {
+  color: var(--muted);
+  letter-spacing: 0;
+  font-size: 12px;
+}
+
+.quick-tabs {
+  gap: 10px;
+}
+
+.tab,
+.primary {
+  min-height: 52px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 750;
+}
+
+.tab {
+  background: #f0f3f7;
+  color: #202631;
+  border: 1px solid #dfe4ea;
+}
+
+.tab.active {
+  background: #e5edff;
+  border-color: #2764d8;
+  color: #1747a6;
+}
+
+input:not([type="radio"]),
+select,
+textarea {
+  background: #fff;
+  color: #202631;
+  border: 1px solid #cbd2dc;
+  min-height: 48px;
+  border-radius: 10px;
+  font-size: 16px;
+}
+
+.primary {
+  background: #2764d8;
+  color: #fff;
+}
+
+.todo-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.task-card {
+  min-width: 0;
+  aspect-ratio: 0.95;
+  padding: 15px;
+  border: 1px solid #dfe4ea;
+  border-left: 4px solid #2764d8;
+  border-radius: 14px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-wrap: anywhere;
+}
+
+.task-card.warning {
+  border-left-color: #d99a16;
+  background: #fffdf7;
+}
+
+.task-card.overdue {
+  border: 2px solid #d14343;
+  background: #fff8f8;
+}
+
+.task-card.done {
+  border-left-color: #16804a;
+  opacity: 0.8;
+}
+
+.task-status {
+  font-size: 13px;
+  font-weight: 750;
+  color: #2764d8;
+}
+
+.task-title {
+  font-size: 18px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.task-due {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.task-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 13px;
+  margin-top: 0;
+}
+
+.task-details {
+  margin-top: auto;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 8px;
+}
+
+.task-details summary {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  color: #2764d8;
+  list-style-position: inside;
+}
+
+.task-detail-content {
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.task-detail-content p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.task-action,
+.danger-btn {
+  width: 100%;
+  min-height: 46px;
+}
+
+.danger-btn {
+  background: #fff0f0;
+  color: #b42318;
+  border: 1px solid #e5aaaa;
+  border-radius: 10px;
+  padding: 12px;
+  font-weight: 700;
+}
+
+.mini-btn {
+  min-height: 42px;
+  padding: 10px 12px;
+  background: #f0f3f7;
+  color: #202631;
+  border: 1px solid #dfe4ea;
+  font-size: 14px;
+}
+
+.metric,
+.record-card,
+.later-card {
+  background: #fff;
+  border-color: #dfe4ea;
+  border-radius: 12px;
+}
+
+.completed-head {
+  margin-top: 28px;
+}
+
+@media (max-width: 700px) {
+  .topbar {
+    padding: 16px;
+  }
+
+  main {
+    width: calc(100% - 20px);
+    margin: 10px auto;
+    gap: 12px;
+  }
+
+  .panel {
+    padding: 16px;
+  }
+
+  .todo-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .task-card {
+    aspect-ratio: 0.88;
+    padding: 11px;
+    gap: 8px;
+  }
+
+  .task-title {
+    font-size: 16px;
+  }
+
+  .task-due {
+    font-size: 12px;
+  }
+
+  .task-meta {
+    font-size: 12px;
+  }
+
+  .task-details summary {
+    font-size: 13px;
+    min-height: 42px;
+  }
+
+  .quick-tabs {
+    gap: 6px;
+  }
+
+  .tab {
+    padding: 12px 5px;
+    font-size: 14px;
+  }
+
+  .money-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row,
+  .inline-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 360px) {
+  .todo-list {
+    grid-template-columns: 1fr;
+  }
+
+  .task-card {
+    aspect-ratio: auto;
+    min-height: 230px;
+  }
+}
+
