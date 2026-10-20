@@ -1,29 +1,46 @@
 
 const $ = (id) => document.getElementById(id);
-const STORAGE_KEY = "personal-os-v2";
+const STORAGE_KEY = "personal-os-v3";
 
-const today = new Date();
-$("today").textContent = today.toLocaleDateString("ja-JP", {
-  year: "numeric", month: "long", day: "numeric", weekday: "short"
-});
+const todayISO = () => {
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+    .toISOString().slice(0, 10);
+};
+const monthISO = () => todayISO().slice(0, 7);
+const yen = n => "¥" + Math.round(Number(n) || 0).toLocaleString("ja-JP");
+const uid = () => crypto.randomUUID?.() || String(Date.now() + Math.random());
+
+function escapeHTML(value = "") {
+  return String(value).replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;",
+    '"': "&quot;", "'": "&#39;"
+  })[c]);
+}
+
+const defaults = {
+  todos: [], completed: [], expenses: [], savings: [], goals: [], later: [],
+  budget: 100000,
+  lastGenre: "仕事",
+  lastWeight: "normal"
+};
 
 function loadData() {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    return {
-      todos: Array.isArray(saved?.todos) ? saved.todos : [],
-      completed: Array.isArray(saved?.completed) ? saved.completed : [],
-      expenses: Array.isArray(saved?.expenses) ? saved.expenses : [],
-      later: Array.isArray(saved?.later) ? saved.later : [],
-      lastGenre: saved?.lastGenre || "仕事",
-      lastWeight: saved?.lastWeight || "normal"
+    const old = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (old && typeof old === "object") return { ...defaults, ...old };
+  } catch {}
+  // Import data from the previous prototype if present.
+  try {
+    const old = JSON.parse(localStorage.getItem("personal-os-v2"));
+    if (old && typeof old === "object") return {
+      ...defaults, ...old,
+      expenses: Array.isArray(old.expenses) ? old.expenses : [],
+      savings: [], goals: [],
+      later: Array.isArray(old.later) ? old.later : []
     };
-  } catch {
-    return {
-      todos: [], completed: [], expenses: [], later: [],
-      lastGenre: "仕事", lastWeight: "normal"
-    };
-  }
+  } catch {}
+  return { ...defaults };
 }
 
 const data = loadData();
@@ -33,300 +50,390 @@ function saveData() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     return true;
   } catch {
-    alert("保存できませんでした。ブラウザの保存容量や設定を確認してください。");
+    alert("保存に失敗しました。ブラウザの保存設定や容量を確認してください。");
     return false;
   }
 }
 
-function escapeHTML(value = "") {
-  return String(value).replace(/[&<>"']/g, (char) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;",
-    '"': "&quot;", "'": "&#39;"
-  })[char]);
+function addAndSave(collection, item) {
+  data[collection].push(item);
+  if (saveData()) return true;
+  data[collection].pop();
+  return false;
 }
 
-function yen(amount) {
-  return "¥" + Number(amount).toLocaleString("ja-JP");
+function setDefault(id, value) {
+  const el = $(id);
+  if (el) el.value = value;
 }
 
-function getTodayISO() {
-  const d = new Date();
-  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 10);
+function ensureExtraUI() {
+  const money = $("money");
+  if (money && !$("savingsForm")) {
+    money.insertAdjacentHTML("beforeend", `
+      <div class="section-head" style="margin-top:24px">
+        <h3>MONTHLY SETTINGS</h3>
+      </div>
+      <form id="budgetForm" class="inline-form">
+        <input id="budgetInput" type="number" min="0" step="1"
+          placeholder="今月の予算（円）" required>
+        <button class="primary" type="submit">予算設定</button>
+      </form>
+
+      <div class="money-grid">
+        <div class="metric">
+          <span class="muted small">今月の貯金</span>
+          <strong id="monthlySavingsView">¥0</strong>
+        </div>
+        <div class="metric">
+          <span class="muted small">累計貯金</span>
+          <strong id="totalSavingsView">¥0</strong>
+        </div>
+      </div>
+
+      <form id="savingsForm" class="inline-form">
+        <input id="savingsAmount" type="number" min="1" step="1"
+          placeholder="貯金額（円）" required>
+        <button class="primary" type="submit">＋ 貯金記録</button>
+      </form>
+      <div id="savingsList" class="record-list"></div>
+
+      <div class="section-head" style="margin-top:26px">
+        <h3>PURCHASE GOALS</h3>
+      </div>
+      <form id="goalForm" class="todo-form">
+        <input id="goalTitle" placeholder="買いたいもの" required maxlength="120">
+        <div class="form-row">
+          <input id="goalAmount" type="number" min="1" step="1"
+            placeholder="目標金額（円）" required>
+          <input id="goalDate" type="date" aria-label="購入希望日" required>
+        </div>
+        <button class="primary" type="submit">＋ 購入目標を追加</button>
+      </form>
+      <div id="goalList" class="record-list"></div>
+    `);
+  }
+
+  const later = $("later");
+  if (later && !$("laterNote")) {
+    $("laterForm")?.insertAdjacentHTML("beforeend", `
+      <textarea id="laterNote" rows="2" placeholder="メモ（任意）"></textarea>
+    `);
+  }
 }
 
+// TODO
 function warningThreshold(weight) {
   return ({ heavy: 0.30, normal: 0.60, light: 0.85 })[weight] ?? 0.60;
 }
-
 function warningDue(task) {
   const start = new Date(task.createdAt + "T00:00:00").getTime();
   const end = new Date(task.due + "T00:00:00").getTime();
-  const now = new Date(getTodayISO() + "T00:00:00").getTime();
-
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
-    return false;
-  }
-
-  const progress = (now - start) / (end - start);
-  return progress >= warningThreshold(task.weight);
+  const now = new Date(todayISO() + "T00:00:00").getTime();
+  return end > start &&
+    (now - start) / (end - start) >= warningThreshold(task.weight);
 }
 
 function renderTodos() {
-  const active = [...data.todos].sort((a, b) => a.due.localeCompare(b.due));
+  if (!$("todoList")) return;
+  const active = [...data.todos].sort((a, b) => (a.due || "").localeCompare(b.due || ""));
   $("todoCount").textContent = `${active.length} TASKS`;
   $("completedCount").textContent = data.completed.length;
 
-  $("todoList").innerHTML = active.length ? active.map(task => {
-    const overdue = task.due < getTodayISO();
-    const warning = !overdue && warningDue(task);
-    const weightName = ({ heavy: "重", normal: "普", light: "軽" })[task.weight] || "普";
-    const status = overdue
-      ? '<span class="overdue-text">OVERDUE</span>'
-      : warning
-        ? '<span class="warning-text">● WARNING</span>'
-        : '<span>● ACTIVE</span>';
-
-    return `
-      <article class="task-card ${overdue ? "overdue" : warning ? "warning" : ""}">
-        <div class="task-top">
-          <div class="task-title">${escapeHTML(task.title)}</div>
-          ${status}
-        </div>
-        <div class="task-meta">
-          <span>${escapeHTML(task.genre)}</span>
-          <span>期日 ${escapeHTML(task.due)}</span>
-          <span>重さ ${weightName}</span>
-          ${warning ? '<span class="warning-text">警告ライン到達</span>' : ""}
-        </div>
-        <div class="card-actions" style="margin-top:12px">
-          <span class="muted small">登録 ${escapeHTML(task.createdAt)}</span>
-          ${overdue
-            ? `<button class="mini-btn" data-delete="${task.id}">削除</button>`
-            : `<button class="mini-btn" data-complete="${task.id}">✓ 完了</button>`}
-        </div>
-      </article>`;
+  $("todoList").innerHTML = active.length ? active.map(t => {
+    const overdue = t.due < todayISO();
+    const warning = !overdue && warningDue(t);
+    return `<article class="task-card ${overdue ? "overdue" : warning ? "warning" : ""}">
+      <div class="task-top">
+        <span class="task-title">${escapeHTML(t.title)}</span>
+        <span class="${overdue ? "overdue-text" : warning ? "warning-text" : ""}">
+          ${overdue ? "OVERDUE" : warning ? "● WARNING" : "● ACTIVE"}
+        </span>
+      </div>
+      <div class="task-meta">
+        <span>${escapeHTML(t.genre)}</span><span>期日 ${escapeHTML(t.due)}</span>
+        <span>重さ ${{heavy:"重",normal:"普",light:"軽"}[t.weight] || "普"}</span>
+      </div>
+      <div class="card-actions" style="margin-top:12px">
+        <span class="muted small">登録 ${escapeHTML(t.createdAt)}</span>
+        ${overdue
+          ? `<button class="mini-btn" data-delete-todo="${t.id}">削除</button>`
+          : `<button class="mini-btn" data-complete-todo="${t.id}">✓ 完了</button>`}
+      </div>
+    </article>`;
   }).join("") : '<div class="empty">TODOはまだありません。</div>';
 
-  $("completedList").innerHTML = data.completed.length
-    ? data.completed.map(task => `
-      <article class="task-card done">
-        <div class="task-top">
-          <span class="task-title">${escapeHTML(task.title)}</span>
-          <span class="muted small">✓ COMPLETE</span>
-        </div>
-        <div class="task-meta">
-          <span>${escapeHTML(task.genre)}</span>
-          <span>期日 ${escapeHTML(task.due)}</span>
-        </div>
-        <div class="card-actions" style="margin-top:10px">
-          <span class="muted small">完了 ${escapeHTML(task.completedAt || "")}</span>
-          <button class="mini-btn" data-restore="${task.id}">戻す</button>
-        </div>
-      </article>`).join("")
-    : '<div class="empty">完了したTODOはここに表示されます。</div>';
+  $("completedList").innerHTML = data.completed.length ? data.completed.map(t => `
+    <article class="task-card done">
+      <div class="task-top"><span class="task-title">${escapeHTML(t.title)}</span>
+        <span class="muted small">✓ COMPLETE</span></div>
+      <div class="task-meta"><span>${escapeHTML(t.genre)}</span>
+        <span>期日 ${escapeHTML(t.due)}</span></div>
+      <button class="mini-btn" data-restore-todo="${t.id}">戻す</button>
+    </article>`).join("") : '<div class="empty">完了履歴はありません。</div>';
 }
 
-$("todoForm").addEventListener("submit", (event) => {
-  event.preventDefault();
-
+$("todoForm")?.addEventListener("submit", e => {
+  e.preventDefault();
   const title = $("todoTitle").value.trim();
   const due = $("todoDue").value;
   if (!title || !due) return;
-
-  const selectedWeight = document.querySelector('input[name="weight"]:checked');
-
   const task = {
-    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
-    title,
-    genre: $("todoGenre").value,
-    due,
-    weight: selectedWeight?.value || data.lastWeight,
-    createdAt: getTodayISO()
+    id: uid(), title, due, genre: $("todoGenre").value,
+    weight: document.querySelector('input[name="weight"]:checked')?.value || data.lastWeight,
+    createdAt: todayISO()
   };
-
-  data.todos.push(task);
+  if (!addAndSave("todos", task)) return;
   data.lastGenre = task.genre;
   data.lastWeight = task.weight;
-
-  if (!saveData()) {
-    data.todos = data.todos.filter(item => item.id !== task.id);
-    return;
-  }
-
+  saveData();
   $("todoTitle").value = "";
   $("todoGenre").value = data.lastGenre;
   document.querySelector(`input[name="weight"][value="${data.lastWeight}"]`).checked = true;
+  renderTodos();
   $("todoTitle").focus();
-  renderTodos();
 });
 
-$("todoList").addEventListener("click", (event) => {
-  const button = event.target.closest("button");
-  if (!button) return;
-
-  if (button.dataset.complete) {
-    const index = data.todos.findIndex(task => task.id === button.dataset.complete);
-    if (index < 0) return;
-    const [task] = data.todos.splice(index, 1);
-    task.completedAt = getTodayISO();
-    data.completed.unshift(task);
-    if (!saveData()) {
-      data.completed.shift();
-      data.todos.splice(index, 0, task);
-      return;
-    }
+$("todoList")?.addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.completeTodo) {
+    const i = data.todos.findIndex(t => t.id === b.dataset.completeTodo);
+    if (i < 0) return;
+    const [t] = data.todos.splice(i, 1);
+    t.completedAt = todayISO();
+    data.completed.unshift(t);
+    if (!saveData()) { data.completed.shift(); data.todos.splice(i, 0, t); }
     renderTodos();
   }
-
-  if (button.dataset.delete) {
-    const index = data.todos.findIndex(task => task.id === button.dataset.delete);
-    if (index < 0) return;
-    const [removed] = data.todos.splice(index, 1);
-    if (!saveData()) {
-      data.todos.splice(index, 0, removed);
-      return;
-    }
+  if (b.dataset.deleteTodo) {
+    const i = data.todos.findIndex(t => t.id === b.dataset.deleteTodo);
+    if (i < 0) return;
+    const [t] = data.todos.splice(i, 1);
+    if (!saveData()) data.todos.splice(i, 0, t);
     renderTodos();
   }
 });
 
-$("completedList").addEventListener("click", (event) => {
-  const button = event.target.closest("[data-restore]");
-  if (!button) return;
-  const index = data.completed.findIndex(task => task.id === button.dataset.restore);
-  if (index < 0) return;
-  const [task] = data.completed.splice(index, 1);
-  delete task.completedAt;
-  data.todos.push(task);
-  if (!saveData()) {
-    data.todos.pop();
-    data.completed.splice(index, 0, task);
-    return;
-  }
+$("completedList")?.addEventListener("click", e => {
+  const b = e.target.closest("[data-restore-todo]");
+  if (!b) return;
+  const i = data.completed.findIndex(t => t.id === b.dataset.restoreTodo);
+  if (i < 0) return;
+  const [t] = data.completed.splice(i, 1);
+  delete t.completedAt;
+  data.todos.push(t);
+  if (!saveData()) { data.todos.pop(); data.completed.splice(i, 0, t); }
   renderTodos();
 });
 
+// MONEY
+function currentMonthExpenses() {
+  return data.expenses.filter(x => (x.date || "").startsWith(monthISO()));
+}
 function renderMoney() {
-  const now = new Date();
-  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const expenses = data.expenses.filter(item => item.date.startsWith(month));
-  const spent = expenses.reduce((sum, item) => sum + item.amount, 0);
-  const budget = 100000;
+  if (!$("spentView")) return;
+  const expenses = currentMonthExpenses();
+  const spent = expenses.reduce((sum, x) => sum + Number(x.amount || 0), 0);
+  const budget = Math.max(0, Number(data.budget) || 0);
+  const remaining = budget - spent;
 
   $("budgetView").textContent = yen(budget);
   $("spentView").textContent = yen(spent);
-  $("remainingView").textContent = yen(Math.max(0, budget - spent));
+  $("remainingView").textContent = yen(remaining);
+  setDefault("budgetInput", budget);
 
-  $("moneyList").innerHTML = expenses.length ? expenses.slice().reverse().map(item => `
+  $("moneyList").innerHTML = expenses.length ? [...expenses].reverse().map(x => `
     <div class="record-card">
-      <span>${escapeHTML(item.date)}</span>
-      <strong>${yen(item.amount)}</strong>
-    </div>`).join("") : '<div class="empty">今月の支出はまだありません。</div>';
+      <div><strong>${yen(x.amount)}</strong><div class="muted small">${escapeHTML(x.date)}</div></div>
+      <button class="mini-btn" data-delete-expense="${x.id}">削除</button>
+    </div>`).join("") : '<div class="empty">今月の支出はありません。</div>';
+
+  const savingsThisMonth = data.savings.filter(x => (x.date || "").startsWith(monthISO()));
+  $("monthlySavingsView").textContent = yen(savingsThisMonth.reduce((s, x) => s + x.amount, 0));
+  $("totalSavingsView").textContent = yen(data.savings.reduce((s, x) => s + x.amount, 0));
+
+  $("savingsList").innerHTML = data.savings.length ? [...data.savings].reverse().map(x => `
+    <div class="record-card">
+      <div><strong>${yen(x.amount)}</strong><div class="muted small">${escapeHTML(x.date)}</div></div>
+      <button class="mini-btn" data-delete-saving="${x.id}">削除</button>
+    </div>`).join("") : '<div class="empty">貯金記録はありません。</div>';
+
+  $("goalList").innerHTML = data.goals.length ? data.goals.map(g => {
+    const months = Math.max(1, (
+      (new Date(g.date + "T00:00:00").getFullYear() - new Date(todayISO() + "T00:00:00").getFullYear()) * 12
+      + new Date(g.date + "T00:00:00").getMonth() - new Date(todayISO() + "T00:00:00").getMonth()
+    ) + 1);
+    const monthly = Math.ceil(g.amount / months);
+    return `<div class="record-card">
+      <div>
+        <strong>${escapeHTML(g.title)}</strong>
+        <div class="muted small">目標 ${yen(g.amount)} · ${escapeHTML(g.date)}</div>
+        <div class="small">月々の目安 <strong>${yen(monthly)}</strong></div>
+      </div>
+      <button class="mini-btn" data-delete-goal="${g.id}">削除</button>
+    </div>`;
+  }).join("") : '<div class="empty">購入目標はまだありません。</div>';
 }
 
-$("moneyForm").addEventListener("submit", (event) => {
-  event.preventDefault();
-  const amount = Number($("moneyAmount").value);
+$("budgetForm")?.addEventListener("submit", e => {
+  e.preventDefault();
+  const value = Number($("budgetInput").value);
+  if (!Number.isFinite(value) || value < 0) return;
+  const previous = data.budget;
+  data.budget = Math.round(value);
+  if (!saveData()) data.budget = previous;
+  renderMoney();
+});
+
+$("moneyForm")?.addEventListener("submit", e => {
+  e.preventDefault();
+  const amount = Math.round(Number($("moneyAmount").value));
   if (!Number.isFinite(amount) || amount <= 0) return;
-
-  const item = {
-    id: String(Date.now()),
-    amount: Math.round(amount),
-    date: getTodayISO()
-  };
-
-  data.expenses.push(item);
-  if (!saveData()) {
-    data.expenses.pop();
-    return;
-  }
-
+  if (!addAndSave("expenses", { id: uid(), amount, date: todayISO() })) return;
   $("moneyAmount").value = "";
   renderMoney();
 });
 
+$("savingsForm")?.addEventListener("submit", e => {
+  e.preventDefault();
+  const amount = Math.round(Number($("savingsAmount").value));
+  if (!Number.isFinite(amount) || amount <= 0) return;
+  if (!addAndSave("savings", { id: uid(), amount, date: todayISO() })) return;
+  $("savingsAmount").value = "";
+  renderMoney();
+});
+
+$("goalForm")?.addEventListener("submit", e => {
+  e.preventDefault();
+  const title = $("goalTitle").value.trim();
+  const amount = Math.round(Number($("goalAmount").value));
+  const date = $("goalDate").value;
+  if (!title || amount <= 0 || !date) return;
+  if (!addAndSave("goals", { id: uid(), title, amount, date })) return;
+  $("goalForm").reset();
+  renderMoney();
+});
+
+$("money")?.addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  for (const [attr, key] of [
+    ["delete-expense", "expenses"], ["delete-saving", "savings"], ["delete-goal", "goals"]
+  ]) {
+    const id = b.dataset[attr];
+    if (!id) continue;
+    const i = data[key].findIndex(x => x.id === id);
+    if (i < 0) return;
+    const [item] = data[key].splice(i, 1);
+    if (!saveData()) data[key].splice(i, 0, item);
+    renderMoney();
+    return;
+  }
+});
+
+// LATER
+function normalizeURL(raw) {
+  if (!raw) return "";
+  let value = raw.trim();
+  if (!/^https?:\/\//i.test(value)) value = "https://" + value;
+  const url = new URL(value);
+  if (!["http:", "https:"].includes(url.protocol)) throw new Error("Invalid URL");
+  return url.href;
+}
+
 function renderLater() {
-  $("laterList").innerHTML = data.later.length ? data.later.slice().reverse().map(item => `
+  if (!$("laterList")) return;
+  $("laterList").innerHTML = data.later.length ? [...data.later].reverse().map(item => `
     <article class="later-card">
       <div class="task-top">
         <strong>${escapeHTML(item.title || item.url || "メモ")}</strong>
-        <button class="mini-btn" data-remove-later="${item.id}">削除</button>
+        <div class="card-actions">
+          <button class="mini-btn" data-edit-later="${item.id}">編集</button>
+          <button class="mini-btn" data-delete-later="${item.id}">削除</button>
+        </div>
       </div>
       ${item.url ? `<p><a href="${escapeHTML(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHTML(item.url)}</a></p>` : ""}
       ${item.note ? `<p>${escapeHTML(item.note)}</p>` : ""}
       <div class="muted small">${escapeHTML(item.date)}</div>
-    </article>`).join("") : '<div class="empty">保存したリンクやメモはここに表示されます。</div>';
+    </article>`).join("") : '<div class="empty">保存したリンクやメモはありません。</div>';
 }
 
-$("laterForm").addEventListener("submit", (event) => {
-  event.preventDefault();
-
-  const url = $("laterUrl").value.trim();
+$("laterForm")?.addEventListener("submit", e => {
+  e.preventDefault();
+  const rawURL = $("laterUrl").value.trim();
   const title = $("laterTitle").value.trim();
   const note = $("laterNote").value.trim();
+  if (!rawURL && !note && !title) return;
 
-  if (!url && !note && !title) return;
-
-  if (url) {
-    try {
-      const parsed = new URL(url);
-      if (!["http:", "https:"].includes(parsed.protocol)) {
-        alert("http または https のURLを入力してください。");
-        return;
-      }
-    } catch {
-      alert("URLの形式を確認してください。");
-      return;
-    }
-  }
-
-  const item = {
-    id: String(Date.now()),
-    title: title || (url ? new URL(url).hostname : "メモ"),
-    url,
-    note,
-    date: getTodayISO()
-  };
-
-  data.later.push(item);
-  if (!saveData()) {
-    data.later.pop();
+  let url = "";
+  try {
+    if (rawURL) url = normalizeURL(rawURL);
+  } catch {
+    alert("URLを確認してください。");
     return;
   }
+
+  const defaultTitle = url ? new URL(url).hostname : "メモ";
+  if (!addAndSave("later", {
+    id: uid(), title: title || defaultTitle, url, note, date: todayISO()
+  })) return;
 
   $("laterForm").reset();
   renderLater();
+  $("laterTitle").focus();
 });
 
-$("laterList").addEventListener("click", (event) => {
-  const button = event.target.closest("[data-remove-later]");
-  if (!button) return;
-  const index = data.later.findIndex(item => item.id === button.dataset.removeLater);
-  if (index < 0) return;
-  const [removed] = data.later.splice(index, 1);
-  if (!saveData()) {
-    data.later.splice(index, 0, removed);
-    return;
+$("laterList")?.addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+
+  if (b.dataset.deleteLater) {
+    const i = data.later.findIndex(x => x.id === b.dataset.deleteLater);
+    if (i < 0) return;
+    const [item] = data.later.splice(i, 1);
+    if (!saveData()) data.later.splice(i, 0, item);
+    renderLater();
   }
-  renderLater();
+
+  if (b.dataset.editLater) {
+    const item = data.later.find(x => x.id === b.dataset.editLater);
+    if (!item) return;
+    const title = prompt("タイトル", item.title);
+    if (title === null) return;
+    const note = prompt("メモ", item.note || "");
+    if (note === null) return;
+    const oldTitle = item.title;
+    const oldNote = item.note;
+    item.title = title.trim() || (item.url ? new URL(item.url).hostname : "メモ");
+    item.note = note;
+    if (!saveData()) { item.title = oldTitle; item.note = oldNote; }
+    renderLater();
+  }
 });
 
+// QUICK ADD navigation
 document.querySelectorAll(".tab").forEach(button => {
   button.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach(tab => tab.classList.remove("active"));
+    document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
     button.classList.add("active");
-    $(button.dataset.target).scrollIntoView({ behavior: "smooth", block: "start" });
-    if (button.dataset.target === "todo") $("todoTitle").focus({ preventScroll: true });
-    if (button.dataset.target === "money") $("moneyAmount").focus({ preventScroll: true });
-    if (button.dataset.target === "later") $("laterTitle").focus({ preventScroll: true });
+    const target = $(button.dataset.target);
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const focusTarget = {
+      todo: "todoTitle", money: "moneyAmount", later: "laterTitle"
+    }[button.dataset.target];
+    if (focusTarget) $(focusTarget)?.focus({ preventScroll: true });
   });
 });
 
-$("todoGenre").value = data.lastGenre;
-document.querySelector(`input[name="weight"][value="${data.lastWeight}"]`).checked = true;
+ensureExtraUI();
+
+setDefault("todoGenre", data.lastGenre);
+const savedWeight = document.querySelector(
+  `input[name="weight"][value="${data.lastWeight}"]`
+);
+if (savedWeight) savedWeight.checked = true;
 
 renderTodos();
 renderMoney();
 renderLater();
-
