@@ -136,41 +136,101 @@ function warningDue(task) {
 
 function renderTodos() {
   if (!$("todoList")) return;
-  const active = [...data.todos].sort((a, b) => (a.due || "").localeCompare(b.due || ""));
-  $("todoCount").textContent = `${active.length} TASKS`;
+
+  const today = todayISO();
+
+  // 締切が近い順。期限超過も上に表示する
+  const active = [...data.todos].sort((a, b) => {
+    return (a.due || "9999-12-31").localeCompare(
+      b.due || "9999-12-31"
+    );
+  });
+
+  $("todoCount").textContent = `${active.length}件`;
   $("completedCount").textContent = data.completed.length;
 
-  $("todoList").innerHTML = active.length ? active.map(t => {
-    const overdue = t.due < todayISO();
-    const warning = !overdue && warningDue(t);
-    return `<article class="task-card ${overdue ? "overdue" : warning ? "warning" : ""}">
-      <div class="task-top">
-        <span class="task-title">${escapeHTML(t.title)}</span>
-        <span class="${overdue ? "overdue-text" : warning ? "warning-text" : ""}">
-          ${overdue ? "OVERDUE" : warning ? "● WARNING" : "● ACTIVE"}
-        </span>
-      </div>
-      <div class="task-meta">
-        <span>${escapeHTML(t.genre)}</span><span>期日 ${escapeHTML(t.due)}</span>
-        <span>重さ ${{heavy:"重",normal:"普",light:"軽"}[t.weight] || "普"}</span>
-      </div>
-      <div class="card-actions" style="margin-top:12px">
-        <span class="muted small">登録 ${escapeHTML(t.createdAt)}</span>
-        ${overdue
-          ? `<button class="mini-btn" data-delete-todo="${t.id}">削除</button>`
-          : `<button class="mini-btn" data-complete-todo="${t.id}">✓ 完了</button>`}
-      </div>
-    </article>`;
-  }).join("") : '<div class="empty">TODOはまだありません。</div>';
+  $("todoList").innerHTML = active.length
+    ? active.map(t => {
+        const overdue = t.due && t.due < today;
+        const warning = !overdue && warningDue(t);
 
-  $("completedList").innerHTML = data.completed.length ? data.completed.map(t => `
-    <article class="task-card done">
-      <div class="task-top"><span class="task-title">${escapeHTML(t.title)}</span>
-        <span class="muted small">✓ COMPLETE</span></div>
-      <div class="task-meta"><span>${escapeHTML(t.genre)}</span>
-        <span>期日 ${escapeHTML(t.due)}</span></div>
-      <button class="mini-btn" data-restore-todo="${t.id}">戻す</button>
-    </article>`).join("") : '<div class="empty">完了履歴はありません。</div>';
+        const weight = {
+          heavy: "重い",
+          normal: "普通",
+          light: "軽い"
+        }[t.weight] || "普通";
+
+        return `
+          <article class="task-card
+            ${overdue ? "overdue" : warning ? "warning" : ""}">
+
+            <div class="task-status ${
+              overdue ? "overdue-text" :
+              warning ? "warning-text" : ""
+            }">
+              ${overdue ? "期限超過" :
+                warning ? "そろそろ着手" : "未完了"}
+            </div>
+
+            <div class="task-title">
+              ${escapeHTML(t.title)}
+            </div>
+
+            <div class="task-due">
+              ${t.due
+                ? "締切 " + escapeHTML(t.due)
+                : "締切なし"}
+            </div>
+
+            <div class="task-meta">
+              <span>${escapeHTML(t.genre || "未分類")}</span>
+              <span>負荷：${weight}</span>
+            </div>
+
+            <details class="task-details">
+              <summary>詳細・操作</summary>
+
+              <div class="task-detail-content">
+                <p>登録日：${escapeHTML(t.createdAt || "不明")}</p>
+
+                ${
+                  overdue
+                    ? `<button class="mini-btn danger-btn"
+                         data-delete-todo="${t.id}">
+                         タスクを削除
+                       </button>`
+                    : `<button class="primary task-action"
+                         data-complete-todo="${t.id}">
+                         ✓ 完了にする
+                       </button>`
+                }
+              </div>
+            </details>
+          </article>
+        `;
+      }).join("")
+    : '<div class="empty">タスクはありません。追加してみよう！</div>';
+
+  $("completedList").innerHTML = data.completed.length
+    ? [...data.completed].map(t => `
+        <article class="task-card done">
+          <div class="task-status">完了</div>
+          <div class="task-title">${escapeHTML(t.title)}</div>
+          <div class="task-due">
+            締切 ${escapeHTML(t.due || "なし")}
+          </div>
+          <details class="task-details">
+            <summary>詳細・操作</summary>
+            <div class="task-detail-content">
+              <button class="mini-btn"
+                data-restore-todo="${t.id}">
+                未完了に戻す
+              </button>
+            </div>
+          </details>
+        </article>
+      `).join("")
+    : '<div class="empty">完了したタスクはここに表示されます。</div>';
 }
 
 $("todoForm")?.addEventListener("submit", e => {
